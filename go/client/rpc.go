@@ -396,6 +396,15 @@ func GetTeamsClient(g *libkb.GlobalContext) (cli keybase1.TeamsClient, err error
 	return cli, nil
 }
 
+func GetKVStoreClient(g *libkb.GlobalContext) (cli keybase1.KvstoreClient, err error) {
+	rcli, _, err := GetRPCClientWithContext(g)
+	if err != nil {
+		return cli, err
+	}
+	cli = keybase1.KvstoreClient{Cli: rcli}
+	return cli, nil
+}
+
 func GetMerkleClient(g *libkb.GlobalContext) (cli keybase1.MerkleClient, err error) {
 	rcli, _, err := GetRPCClientWithContext(g)
 	if err != nil {
