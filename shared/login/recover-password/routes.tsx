@@ -3,6 +3,7 @@ import ExplainDevice from './explain-device/container'
 import Error from './error/container'
 import PaperKey from './paper-key/container'
 import PromptReset from './prompt-reset/container'
+import Password from './password'
 
 export const newRoutes = {
   recoverPasswordDeviceSelector: {
@@ -19,5 +20,11 @@ export const newRoutes = {
   },
   recoverPasswordPromptReset: {
     getScreen: (): typeof PromptReset => require('./prompt-reset/container').default,
+  },
+}
+
+export const newModalRoutes = {
+  recoverPasswordSetPassword: {
+    getScreen: (): typeof Password => require('./password').default,
   },
 }
