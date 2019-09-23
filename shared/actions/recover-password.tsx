@@ -4,6 +4,7 @@ import * as RecoverPasswordGen from '../actions/recover-password-gen'
 import * as RouteTreeGen from '../actions/route-tree-gen'
 import * as Constants from '../constants/provision'
 import * as Container from '../util/container'
+import HiddenString from '../util/hidden-string'
 import {RPCError} from '../util/errors'
 
 const chooseDevice = (
@@ -92,7 +93,7 @@ const inputPaperKey = (
       if (params.pinentry.retryLabel) {
         yield Saga.put(
           RecoverPasswordGen.createSetPaperKeyError({
-            error: params.pinentry.retryLabel,
+            error: new HiddenString(params.pinentry.retryLabel),
           })
         )
       }
@@ -123,7 +124,9 @@ const inputPaperKey = (
       }
     } else {
       if (params.pinentry.retryLabel) {
-        yield Saga.put(RecoverPasswordGen.createSetPasswordError({error: params.pinentry.retryLabel}))
+        yield Saga.put(
+          RecoverPasswordGen.createSetPasswordError({error: new HiddenString(params.pinentry.retryLabel)})
+        )
       }
       yield Saga.put(RouteTreeGen.createNavigateAppend({path: ['recoverPasswordSetPassword']}))
       const action: RecoverPasswordGen.SubmitPasswordPayload = yield Saga.take([
@@ -162,7 +165,7 @@ function* startRecoverPassword(
     ) {
       yield Saga.put(
         RecoverPasswordGen.createDisplayError({
-          error: e.toString(),
+          error: new HiddenString(e.toString()),
         })
       )
     }
