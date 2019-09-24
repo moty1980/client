@@ -31,18 +31,18 @@ func NewKVRevisionCache() *KVRevisionCache {
 	}
 }
 
-func (k *KVRevisionCache) Check(teamID keybase1.TeamID, namespace, entryKey, entryHash string, teamKeyGen keybase1.PerTeamKeyGeneration, revision int) (err error) {
+func (k *KVRevisionCache) Check(entryID keybase1.KVEntryID, entryHash string, teamKeyGen keybase1.PerTeamKeyGeneration, revision int) (err error) {
 	k.Lock()
 	defer k.Unlock()
 
-	// populate intermediate data structures
-	_, ok := k.data[teamID]
+	// populate intermediate data structures to prevent panics
+	_, ok := k.data[entryID.TeamID]
 	if !ok {
-		k.data[teamID] = make(map[string]map[string]kvCacheEntry)
+		k.data[entryID.TeamID] = make(map[string]map[string]kvCacheEntry)
 	}
-	_, ok = k.data[teamID][namespace]
+	_, ok = k.data[entryID.TeamID][entryID.Namespace]
 	if !ok {
-		k.data[teamID][namespace] = make(map[string]kvCacheEntry)
+		k.data[entryID.TeamID][entryID.Namespace] = make(map[string]kvCacheEntry)
 	}
 
 	newEntry := kvCacheEntry{
@@ -50,7 +50,7 @@ func (k *KVRevisionCache) Check(teamID keybase1.TeamID, namespace, entryKey, ent
 		TeamKeyGen: teamKeyGen,
 		Revision:   revision,
 	}
-	entry, ok := k.data[teamID][namespace][entryKey]
+	entry, ok := k.data[entryID.TeamID][entryID.Namespace][entryID.EntryKey]
 	if ok {
 		// the cache knows about this
 		err = checkNewAgainstCachedEntry(newEntry, entry)
@@ -58,12 +58,22 @@ func (k *KVRevisionCache) Check(teamID keybase1.TeamID, namespace, entryKey, ent
 			return err
 		}
 	}
-	k.data[teamID][namespace][entryKey] = newEntry
+	k.data[entryID.TeamID][entryID.Namespace][entryID.EntryKey] = newEntry
 	return nil
 }
 
-func (k *KVRevisionCache) FetchRevision(teamID keybase1.TeamID, namespace, entryKey string) (revision int) {
-	entry, ok := k.data[teamID][namespace][entryKey]
+func (k *KVRevisionCache) FetchRevision(entryID keybase1.KVEntryID) (revision int) {
+	// populate intermediate data structures to prevent panics
+	_, ok := k.data[entryID.TeamID]
+	if !ok {
+		k.data[entryID.TeamID] = make(map[string]map[string]kvCacheEntry)
+	}
+	_, ok = k.data[entryID.TeamID][entryID.Namespace]
+	if !ok {
+		k.data[entryID.TeamID][entryID.Namespace] = make(map[string]kvCacheEntry)
+	}
+	// fetch and default to 0
+	entry, ok := k.data[entryID.TeamID][entryID.Namespace][entryID.EntryKey]
 	if !ok {
 		return 0
 	}

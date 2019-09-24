@@ -19,6 +19,13 @@ protocol kvstore {
     int revision;
   }
 
+  // for passing around internally
+  record KVEntryID {
+    TeamID teamID;
+    string namespace;
+    string entryKey;
+  }
+
   record EncryptedKVEntry {
     int v;                    // version
     bytes e;                  // encrypted data

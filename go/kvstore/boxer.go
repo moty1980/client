@@ -15,8 +15,8 @@ import (
 )
 
 type KVStoreBoxer interface {
-	Box(mctx libkb.MetaContext, teamID keybase1.TeamID, namespace, entryKey string, revision int, cleartextValue string) (ciphertext string, teamKeyGen keybase1.PerTeamKeyGeneration, err error)
-	Unbox(mctx libkb.MetaContext, teamID keybase1.TeamID, namespace, entryKey string, revision int, ciphertext string,
+	Box(mctx libkb.MetaContext, entryID keybase1.KVEntryID, revision int, cleartextValue string) (ciphertext string, teamKeyGen keybase1.PerTeamKeyGeneration, err error)
+	Unbox(mctx libkb.MetaContext, entryID keybase1.KVEntryID, revision int, ciphertext string,
 		senderUID keybase1.UID, senderEldestSeqno keybase1.Seqno, senderDeviceID keybase1.DeviceID) (cleartext string, err error)
 }
 
@@ -32,9 +32,9 @@ func NewKVStoreBoxer(g *libkb.GlobalContext) *KVStoreRealBoxer {
 	}
 }
 
-func (b *KVStoreRealBoxer) sign(namespace, entryKey string, clearBytes []byte, revision int, nonce [24]byte) (ret keybase1.ED25519Signature, err error) {
+func (b *KVStoreRealBoxer) sign(entryID keybase1.KVEntryID, clearBytes []byte, revision int, nonce [24]byte, encKey keybase1.Bytes32) (ret keybase1.ED25519Signature, err error) {
 	// build the message
-	msg, err := b.buildSignatureMsg(namespace, entryKey, clearBytes, revision, nonce)
+	msg, err := b.buildSignatureMsg(entryID, clearBytes, revision, nonce, encKey)
 	if err != nil {
 		return ret, err
 	}
@@ -55,12 +55,12 @@ func (b *KVStoreRealBoxer) sign(namespace, entryKey string, clearBytes []byte, r
 	return keybase1.ED25519Signature(sigInfo.Sig), nil
 }
 
-func (b *KVStoreRealBoxer) verify(mctx libkb.MetaContext, namespace, entryKey string, revision int,
-	clearBytes []byte, sig kbcrypto.NaclSignature, nonce [24]byte,
+func (b *KVStoreRealBoxer) verify(mctx libkb.MetaContext, sig kbcrypto.NaclSignature, entryID keybase1.KVEntryID, revision int,
+	clearBytes []byte, nonce [24]byte, encKey keybase1.Bytes32,
 	senderUID keybase1.UID, senderEldestSeqno keybase1.Seqno, senderDeviceID keybase1.DeviceID) (err error) {
 
 	// build the expected message
-	expectedInput, err := b.buildSignatureMsg(namespace, entryKey, clearBytes, revision, nonce)
+	expectedInput, err := b.buildSignatureMsg(entryID, clearBytes, revision, nonce, encKey)
 	if err != nil {
 		return err
 	}
@@ -82,16 +82,17 @@ func (b *KVStoreRealBoxer) verify(mctx libkb.MetaContext, namespace, entryKey st
 	return err
 }
 
-func (b *KVStoreRealBoxer) buildSignatureMsg(namespace, entryKey string, clearBytes []byte, revision int, nonce [24]byte) (ret []byte, err error) {
+func (b *KVStoreRealBoxer) buildSignatureMsg(entryID keybase1.KVEntryID, clearBytes []byte, revision int, nonce [24]byte, encKey keybase1.Bytes32) (ret []byte, err error) {
 	clearHash := sha512.Sum512(clearBytes)
-	ret = append(ret, []byte(namespace)...)
-	ret = append(ret, []byte(entryKey)...)
+	ret = append(ret, []byte(entryID.TeamID)...)
+	ret = append(ret, []byte(entryID.Namespace)...)
+	ret = append(ret, []byte(entryID.EntryKey)...)
 	ret = append(ret, clearHash[:]...)
 	revBytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(revBytes, uint32(revision))
 	ret = append(ret, revBytes...)
 	ret = append(ret, nonce[:]...)
-	// encryptionkey
+	ret = append(ret, encKey[:]...)
 	return ret, nil
 }
 
@@ -104,24 +105,15 @@ func newNonce() (ret [24]byte, err error) {
 	return ret, nil
 }
 
-func (b *KVStoreRealBoxer) Box(mctx libkb.MetaContext, teamID keybase1.TeamID, namespace, entryKey string, revision int, cleartext string) (ciphertext string, teamKeyGen keybase1.PerTeamKeyGeneration, err error) {
+func (b *KVStoreRealBoxer) Box(mctx libkb.MetaContext, entryID keybase1.KVEntryID, revision int, cleartext string) (ciphertext string, teamKeyGen keybase1.PerTeamKeyGeneration, err error) {
 	clearBytes := []byte(cleartext)
 	nonce, err := newNonce()
 	if err != nil {
 		return "", keybase1.PerTeamKeyGeneration(0), err
 	}
-	sig, err := b.sign(namespace, entryKey, clearBytes, revision, nonce)
-	if err != nil {
-		return "", keybase1.PerTeamKeyGeneration(0), err
-	}
-	// compose sig+clearbytes
-	var data []byte
-	data = append(data, sig[:]...)
-	data = append(data, clearBytes...)
-
 	// fetch the encryption key
 	loadArg := keybase1.FastTeamLoadArg{
-		ID:            teamID,
+		ID:            entryID.TeamID,
 		Applications:  []keybase1.TeamApplication{keybase1.TeamApplication_KVSTORE},
 		NeedLatestKey: true,
 	}
@@ -131,6 +123,16 @@ func (b *KVStoreRealBoxer) Box(mctx libkb.MetaContext, teamID keybase1.TeamID, n
 	}
 	appKey := teamLoadRes.ApplicationKeys[0]
 	teamGen := keybase1.PerTeamKeyGeneration(appKey.Generation())
+
+	// build the signature
+	sig, err := b.sign(entryID, clearBytes, revision, nonce, appKey.Key)
+	if err != nil {
+		return "", keybase1.PerTeamKeyGeneration(0), err
+	}
+	// compose sig+clearbytes
+	var data []byte
+	data = append(data, sig[:]...)
+	data = append(data, clearBytes...)
 
 	// encrypt
 	var encKey [libkb.NaclSecretBoxKeySize]byte = appKey.Key
@@ -149,7 +151,7 @@ func (b *KVStoreRealBoxer) Box(mctx libkb.MetaContext, teamID keybase1.TeamID, n
 	return base64.StdEncoding.EncodeToString(packed), teamGen, nil
 }
 
-func (b *KVStoreRealBoxer) Unbox(mctx libkb.MetaContext, teamID keybase1.TeamID, namespace, entryKey string, revision int, ciphertext string,
+func (b *KVStoreRealBoxer) Unbox(mctx libkb.MetaContext, entryID keybase1.KVEntryID, revision int, ciphertext string,
 	senderUID keybase1.UID, senderEldestSeqno keybase1.Seqno, senderDeviceID keybase1.DeviceID) (cleartext string, err error) {
 
 	decoded, err := base64.StdEncoding.DecodeString(ciphertext)
@@ -164,7 +166,7 @@ func (b *KVStoreRealBoxer) Unbox(mctx libkb.MetaContext, teamID keybase1.TeamID,
 	// fetch the team application key for decryption
 	generation := box.Gen
 	loadArg := keybase1.FastTeamLoadArg{
-		ID:                   teamID,
+		ID:                   entryID.TeamID,
 		Applications:         []keybase1.TeamApplication{keybase1.TeamApplication_KVSTORE},
 		KeyGenerationsNeeded: []keybase1.PerTeamKeyGeneration{generation},
 	}
@@ -190,7 +192,7 @@ func (b *KVStoreRealBoxer) Unbox(mctx libkb.MetaContext, teamID keybase1.TeamID,
 	copy(sig[:], sigBytes)
 	clearBytes := decrypted[ed25519.SignatureSize:]
 
-	err = b.verify(mctx, namespace, entryKey, revision, clearBytes, sig, nonce, senderUID, senderEldestSeqno, senderDeviceID)
+	err = b.verify(mctx, sig, entryID, revision, clearBytes, nonce, appKey.Key, senderUID, senderEldestSeqno, senderDeviceID)
 	if err != nil {
 		return "", err
 	}

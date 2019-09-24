@@ -72,32 +72,32 @@ func (k *getEntryAPIRes) GetAppStatus() *libkb.AppStatus {
 	return &k.Status
 }
 
-func (h *KVStoreHandler) serverFetch(mctx libkb.MetaContext, teamID keybase1.TeamID, namespace, entryKey string) (emptyRes getEntryAPIRes, err error) {
+func (h *KVStoreHandler) serverFetch(mctx libkb.MetaContext, entryID keybase1.KVEntryID) (emptyRes getEntryAPIRes, err error) {
 	var apiRes getEntryAPIRes
 	apiArg := libkb.APIArg{
 		Endpoint:    "team/storage",
 		SessionType: libkb.APISessionTypeREQUIRED,
 		Args: libkb.HTTPArgs{
-			"team_id":   libkb.S{Val: teamID.String()},
-			"namespace": libkb.S{Val: namespace},
-			"entry_key": libkb.S{Val: entryKey},
+			"team_id":   libkb.S{Val: entryID.TeamID.String()},
+			"namespace": libkb.S{Val: entryID.Namespace},
+			"entry_key": libkb.S{Val: entryID.EntryKey},
 		},
 	}
 	err = mctx.G().API.GetDecode(mctx, apiArg, &apiRes)
 	if err != nil {
 		return emptyRes, err
 	}
-	if apiRes.TeamID != teamID {
-		return emptyRes, fmt.Errorf("api returned an unexpected teamID: %s isn't %s", apiRes.TeamID, teamID)
+	if apiRes.TeamID != entryID.TeamID {
+		return emptyRes, fmt.Errorf("api returned an unexpected teamID: %s isn't %s", apiRes.TeamID, entryID.TeamID)
 	}
-	if apiRes.Namespace != namespace {
-		return emptyRes, fmt.Errorf("api returned an unexpected namespace: %s isn't %s", apiRes.Namespace, namespace)
+	if apiRes.Namespace != entryID.Namespace {
+		return emptyRes, fmt.Errorf("api returned an unexpected namespace: %s isn't %s", apiRes.Namespace, entryID.Namespace)
 	}
-	if apiRes.EntryKey != entryKey {
-		return emptyRes, fmt.Errorf("api returned an unexpected entryKey: %s isn't %s", apiRes.EntryKey, entryKey)
+	if apiRes.EntryKey != entryID.EntryKey {
+		return emptyRes, fmt.Errorf("api returned an unexpected entryKey: %s isn't %s", apiRes.EntryKey, entryID.EntryKey)
 	}
 	entryHash := kvstore.Hash(apiRes.Ciphertext)
-	err = mctx.G().GetKVRevisionCache().Check(teamID, namespace, entryKey, entryHash, apiRes.TeamKeyGen, apiRes.Revision)
+	err = mctx.G().GetKVRevisionCache().Check(entryID, entryHash, apiRes.TeamKeyGen, apiRes.Revision)
 	if err != nil {
 		return emptyRes, err
 	}
@@ -114,11 +114,16 @@ func (h *KVStoreHandler) GetKVEntry(ctx context.Context, arg keybase1.GetKVEntry
 	if err != nil {
 		return res, err
 	}
-	apiRes, err := h.serverFetch(mctx, teamID, arg.Namespace, arg.EntryKey)
+	entryID := keybase1.KVEntryID{
+		TeamID:    teamID,
+		Namespace: arg.Namespace,
+		EntryKey:  arg.EntryKey,
+	}
+	apiRes, err := h.serverFetch(mctx, entryID)
 	if err != nil {
 		return res, err
 	}
-	cleartext, err := h.Boxer.Unbox(mctx, teamID, arg.Namespace, arg.EntryKey, apiRes.Revision, apiRes.Ciphertext, apiRes.WriterUID, apiRes.WriterEldestSeqno, apiRes.WriterDeviceID)
+	cleartext, err := h.Boxer.Unbox(mctx, entryID, apiRes.Revision, apiRes.Ciphertext, apiRes.WriterUID, apiRes.WriterEldestSeqno, apiRes.WriterDeviceID)
 	if err != nil {
 		return res, err
 	}
@@ -141,11 +146,11 @@ func (k *putEntryAPIRes) GetAppStatus() *libkb.AppStatus {
 	return &k.Status
 }
 
-func (h *KVStoreHandler) fetchRevisionFromCacheOrServer(mctx libkb.MetaContext, teamID keybase1.TeamID, namespace, entryKey string) (int, error) {
-	prevRevision := mctx.G().GetKVRevisionCache().FetchRevision(teamID, namespace, entryKey)
+func (h *KVStoreHandler) fetchRevisionFromCacheOrServer(mctx libkb.MetaContext, entryID keybase1.KVEntryID) (int, error) {
+	prevRevision := mctx.G().GetKVRevisionCache().FetchRevision(entryID)
 	if prevRevision == 0 {
 		// not in the cache. check if it's in the server.
-		serverRes, err := h.serverFetch(mctx, teamID, namespace, entryKey)
+		serverRes, err := h.serverFetch(mctx, entryID)
 		if err != nil {
 			return 0, err
 		}
@@ -164,12 +169,17 @@ func (h *KVStoreHandler) PutKVEntry(ctx context.Context, arg keybase1.PutKVEntry
 	if err != nil {
 		return res, err
 	}
-	prevRevision, err := h.fetchRevisionFromCacheOrServer(mctx, teamID, arg.Namespace, arg.EntryKey)
+	entryID := keybase1.KVEntryID{
+		TeamID:    teamID,
+		Namespace: arg.Namespace,
+		EntryKey:  arg.EntryKey,
+	}
+	prevRevision, err := h.fetchRevisionFromCacheOrServer(mctx, entryID)
 	if err != nil {
 		return res, err
 	}
 	revision := prevRevision + 1
-	ciphertext, teamKeyGen, err := h.Boxer.Box(mctx, teamID, arg.Namespace, arg.EntryKey, revision, arg.EntryValue)
+	ciphertext, teamKeyGen, err := h.Boxer.Box(mctx, entryID, revision, arg.EntryValue)
 	if err != nil {
 		return res, err
 	}
@@ -177,10 +187,10 @@ func (h *KVStoreHandler) PutKVEntry(ctx context.Context, arg keybase1.PutKVEntry
 		Endpoint:    "team/storage",
 		SessionType: libkb.APISessionTypeREQUIRED,
 		Args: libkb.HTTPArgs{
-			"team_id":            libkb.S{Val: teamID.String()},
+			"team_id":            libkb.S{Val: entryID.TeamID.String()},
 			"team_key_gen":       libkb.I{Val: int(teamKeyGen)},
-			"namespace":          libkb.S{Val: arg.Namespace},
-			"entry_key":          libkb.S{Val: arg.EntryKey},
+			"namespace":          libkb.S{Val: entryID.Namespace},
+			"entry_key":          libkb.S{Val: entryID.EntryKey},
 			"ciphertext":         libkb.S{Val: ciphertext},
 			"ciphertext_version": libkb.I{Val: 1},
 			"revision":           libkb.I{Val: revision},
@@ -195,7 +205,7 @@ func (h *KVStoreHandler) PutKVEntry(ctx context.Context, arg keybase1.PutKVEntry
 		return res, fmt.Errorf("kvstore PUT revision error. expected %d, got %d", prevRevision+1, apiRes.Revision)
 	}
 	entryHash := kvstore.Hash(ciphertext)
-	err = mctx.G().GetKVRevisionCache().Check(teamID, arg.Namespace, arg.EntryKey, entryHash, teamKeyGen, apiRes.Revision)
+	err = mctx.G().GetKVRevisionCache().Check(entryID, entryHash, teamKeyGen, apiRes.Revision)
 	if err != nil {
 		return res, err
 	}

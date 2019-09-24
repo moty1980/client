@@ -42,6 +42,20 @@ func (o KVPutResult) DeepCopy() KVPutResult {
 	}
 }
 
+type KVEntryID struct {
+	TeamID    TeamID `codec:"teamID" json:"teamID"`
+	Namespace string `codec:"namespace" json:"namespace"`
+	EntryKey  string `codec:"entryKey" json:"entryKey"`
+}
+
+func (o KVEntryID) DeepCopy() KVEntryID {
+	return KVEntryID{
+		TeamID:    o.TeamID.DeepCopy(),
+		Namespace: o.Namespace,
+		EntryKey:  o.EntryKey,
+	}
+}
+
 type EncryptedKVEntry struct {
 	V   int                  `codec:"v" json:"v"`
 	E   []byte               `codec:"e" json:"e"`

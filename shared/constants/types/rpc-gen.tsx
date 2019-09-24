@@ -2548,6 +2548,7 @@ export type KBFSStatus = {readonly version: String; readonly installedVersion: S
 export type KBFSTeamSettings = {readonly tlfID: TLFID}
 export type KID = String
 export type KVEntry = {readonly teamName: String; readonly namespace: String; readonly entryKey: String; readonly entryValue: String; readonly revision: Int}
+export type KVEntryID = {readonly teamID: TeamID; readonly namespace: String; readonly entryKey: String}
 export type KVPutResult = {readonly teamName: String; readonly namespace: String; readonly entryKey: String; readonly revision: Int}
 export type KbClientStatus = {readonly version: String}
 export type KbServiceStatus = {readonly version: String; readonly running: Boolean; readonly pid: String; readonly log: String; readonly ekLog: String}

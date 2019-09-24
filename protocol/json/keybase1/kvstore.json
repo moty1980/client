@@ -57,6 +57,24 @@
     },
     {
       "type": "record",
+      "name": "KVEntryID",
+      "fields": [
+        {
+          "type": "TeamID",
+          "name": "teamID"
+        },
+        {
+          "type": "string",
+          "name": "namespace"
+        },
+        {
+          "type": "string",
+          "name": "entryKey"
+        }
+      ]
+    },
+    {
+      "type": "record",
       "name": "EncryptedKVEntry",
       "fields": [
         {
