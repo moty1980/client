@@ -42,6 +42,27 @@ func (o KVPutResult) DeepCopy() KVPutResult {
 	}
 }
 
+type EncryptedKVEntry struct {
+	V   int                  `codec:"v" json:"v"`
+	E   []byte               `codec:"e" json:"e"`
+	N   BoxNonce             `codec:"n" json:"n"`
+	Gen PerTeamKeyGeneration `codec:"gen" json:"gen"`
+}
+
+func (o EncryptedKVEntry) DeepCopy() EncryptedKVEntry {
+	return EncryptedKVEntry{
+		V: o.V,
+		E: (func(x []byte) []byte {
+			if x == nil {
+				return nil
+			}
+			return append([]byte{}, x...)
+		})(o.E),
+		N:   o.N.DeepCopy(),
+		Gen: o.Gen.DeepCopy(),
+	}
+}
+
 type GetKVEntryArg struct {
 	SessionID int    `codec:"sessionID" json:"sessionID"`
 	TeamName  string `codec:"teamName" json:"teamName"`

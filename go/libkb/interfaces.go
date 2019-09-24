@@ -1114,6 +1114,6 @@ type SyncedContactListProvider interface {
 }
 
 type KVRevisionCacher interface {
-	Check(teamID keybase1.TeamID, namespace, entryKey, entryHash string, teamKeyGen, revision int) (err error)
+	Check(teamID keybase1.TeamID, namespace, entryKey, entryHash string, teamKeyGen keybase1.PerTeamKeyGeneration, revision int) (err error)
 	FetchRevision(teamID keybase1.TeamID, namespace, entryKey string) (revision int)
 }

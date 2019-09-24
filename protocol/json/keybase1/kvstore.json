@@ -54,6 +54,28 @@
           "name": "revision"
         }
       ]
+    },
+    {
+      "type": "record",
+      "name": "EncryptedKVEntry",
+      "fields": [
+        {
+          "type": "int",
+          "name": "v"
+        },
+        {
+          "type": "bytes",
+          "name": "e"
+        },
+        {
+          "type": "BoxNonce",
+          "name": "n"
+        },
+        {
+          "type": "PerTeamKeyGeneration",
+          "name": "gen"
+        }
+      ]
     }
   ],
   "messages": {

@@ -15,7 +15,7 @@ var _ libkb.KVRevisionCacher = (*KVRevisionCache)(nil)
 type kvCacheEntry struct {
 	Revision   int
 	EntryHash  string
-	TeamKeyGen int
+	TeamKeyGen keybase1.PerTeamKeyGeneration
 }
 
 type kvCacheData map[keybase1.TeamID]map[string] /*namespace*/ map[string] /*entry*/ kvCacheEntry
@@ -31,7 +31,7 @@ func NewKVRevisionCache() *KVRevisionCache {
 	}
 }
 
-func (k *KVRevisionCache) Check(teamID keybase1.TeamID, namespace, entryKey, entryHash string, teamKeyGen, revision int) (err error) {
+func (k *KVRevisionCache) Check(teamID keybase1.TeamID, namespace, entryKey, entryHash string, teamKeyGen keybase1.PerTeamKeyGeneration, revision int) (err error) {
 	k.Lock()
 	defer k.Unlock()
 

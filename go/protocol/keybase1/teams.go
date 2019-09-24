@@ -59,6 +59,7 @@ const (
 	TeamApplication_GIT_METADATA        TeamApplication = 4
 	TeamApplication_SEITAN_INVITE_TOKEN TeamApplication = 5
 	TeamApplication_STELLAR_RELAY       TeamApplication = 6
+	TeamApplication_KVSTORE             TeamApplication = 7
 )
 
 func (o TeamApplication) DeepCopy() TeamApplication { return o }
@@ -70,6 +71,7 @@ var TeamApplicationMap = map[string]TeamApplication{
 	"GIT_METADATA":        4,
 	"SEITAN_INVITE_TOKEN": 5,
 	"STELLAR_RELAY":       6,
+	"KVSTORE":             7,
 }
 
 var TeamApplicationRevMap = map[TeamApplication]string{
@@ -79,6 +81,7 @@ var TeamApplicationRevMap = map[TeamApplication]string{
 	4: "GIT_METADATA",
 	5: "SEITAN_INVITE_TOKEN",
 	6: "STELLAR_RELAY",
+	7: "KVSTORE",
 }
 
 func (e TeamApplication) String() string {

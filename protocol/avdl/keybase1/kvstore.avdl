@@ -3,6 +3,7 @@
 protocol kvstore {
   import idl "common.avdl";
 
+  // for shipping down to the CLI
   record KVEntry {
     string teamName;
     string namespace;
@@ -16,6 +17,13 @@ protocol kvstore {
     string namespace;
     string entryKey;
     int revision;
+  }
+
+  record EncryptedKVEntry {
+    int v;                    // version
+    bytes e;                  // encrypted data
+    BoxNonce n;               // nonce
+    PerTeamKeyGeneration gen; // key generation that was used
   }
 
   KVEntry getKVEntry(int sessionID, string teamName, string namespace, string entryKey);
