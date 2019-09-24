@@ -8,7 +8,7 @@ import (
 	context "golang.org/x/net/context"
 )
 
-type KVEntry struct {
+type KVGetResult struct {
 	TeamName   string `codec:"teamName" json:"teamName"`
 	Namespace  string `codec:"namespace" json:"namespace"`
 	EntryKey   string `codec:"entryKey" json:"entryKey"`
@@ -16,8 +16,8 @@ type KVEntry struct {
 	Revision   int    `codec:"revision" json:"revision"`
 }
 
-func (o KVEntry) DeepCopy() KVEntry {
-	return KVEntry{
+func (o KVGetResult) DeepCopy() KVGetResult {
+	return KVGetResult{
 		TeamName:   o.TeamName,
 		Namespace:  o.Namespace,
 		EntryKey:   o.EntryKey,
@@ -93,7 +93,7 @@ type PutKVEntryArg struct {
 }
 
 type KvstoreInterface interface {
-	GetKVEntry(context.Context, GetKVEntryArg) (KVEntry, error)
+	GetKVEntry(context.Context, GetKVEntryArg) (KVGetResult, error)
 	PutKVEntry(context.Context, PutKVEntryArg) (KVPutResult, error)
 }
 
@@ -139,7 +139,7 @@ type KvstoreClient struct {
 	Cli rpc.GenericClient
 }
 
-func (c KvstoreClient) GetKVEntry(ctx context.Context, __arg GetKVEntryArg) (res KVEntry, err error) {
+func (c KvstoreClient) GetKVEntry(ctx context.Context, __arg GetKVEntryArg) (res KVGetResult, err error) {
 	err = c.Cli.Call(ctx, "keybase.1.kvstore.getKVEntry", []interface{}{__arg}, &res)
 	return
 }

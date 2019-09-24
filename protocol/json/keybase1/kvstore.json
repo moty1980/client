@@ -9,7 +9,7 @@
   "types": [
     {
       "type": "record",
-      "name": "KVEntry",
+      "name": "KVGetResult",
       "fields": [
         {
           "type": "string",
@@ -116,7 +116,7 @@
           "type": "string"
         }
       ],
-      "response": "KVEntry"
+      "response": "KVGetResult"
     },
     "putKVEntry": {
       "request": [
